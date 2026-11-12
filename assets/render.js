@@ -329,6 +329,40 @@
       phoneValid(state.phone) && !state.sending;
   }
 
+  /** The level test lasts 40 minutes. */
+  var TEST_MINUTES = 40;
+
+  /** 2026-11-20T15:00:00.000Z → 20261120T150000Z (Google Calendar's form). */
+  function calStamp(d) {
+    return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+  }
+
+  /**
+   * Opens Google Calendar with the booked test filled in, for the visitor to
+   * save in their own calendar ('' when no time is chosen).
+   */
+  function calendarUrl(lang, slot) {
+    var start = new Date(slot);
+    if (!slot || isNaN(start.getTime())) return '';
+    var end = new Date(start.getTime() + TEST_MINUTES * 60000);
+    var e = D.i18n;
+    function raw(key) { return e[key][lang] != null ? e[key][lang] : e[key].en; }
+    return 'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+      '&text=' + encodeURIComponent(raw('calendarEventTitle')) +
+      '&dates=' + calStamp(start) + '/' + calStamp(end) +
+      '&details=' + encodeURIComponent(raw('calendarEventDetails'));
+  }
+
+  /** "Fri, 20 Nov, 6:00 PM" in the visitor's clock. */
+  function slotLabel(lang, slot) {
+    var d = new Date(slot);
+    if (!slot || isNaN(d.getTime())) return '';
+    return d.toLocaleString(LOCALES[lang] || 'en-US', {
+      weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit',
+      calendar: 'gregory',
+    });
+  }
+
   function booking(lang, state, now) {
     var input = 'rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:border-primary';
     var h = '<section id="book" class="mt-8 rounded-3xl border border-amber/30 bg-gradient-to-br from-amber/15 to-primary/10 p-5">' +
@@ -340,11 +374,21 @@
         '<h3 class="text-base font-bold">' + t(lang, 'confirmTitle') + '</h3></div>' +
         '<p class="mb-4 text-sm leading-relaxed text-muted-foreground">' + t(lang, 'done') + '</p>' +
         '<div class="space-y-2 rounded-xl bg-card p-3 text-sm">' +
+        (slotLabel(lang, state.slot)
+          ? '<div class="flex items-center justify-between gap-2"><span class="text-muted-foreground">' + t(lang, 'confirmTimeLabel') + '</span>' +
+            '<span class="font-medium" id="rf-done-time">' + esc(slotLabel(lang, state.slot)) + '</span></div>'
+          : '') +
         '<div class="flex items-center justify-between gap-2"><span class="text-muted-foreground">' + t(lang, 'confirmEmailLabel') + '</span>' +
         '<span class="font-medium" dir="ltr">' + esc(String(state.email).trim()) + '</span></div>' +
         '<div class="flex items-center justify-between gap-2"><span class="text-muted-foreground">' + t(lang, 'confirmPhoneLabel') + '</span>' +
         '<span class="font-medium" dir="ltr">' + esc(fullPhone(state)) + '</span></div></div>' +
-        '<p class="mt-4 text-xs leading-relaxed text-muted-foreground">' + t(lang, 'confirmNote') + '</p></div>';
+        '<p class="mt-4 text-xs leading-relaxed text-muted-foreground">' + t(lang, 'confirmNote') + '</p>' +
+        (calendarUrl(lang, state.slot)
+          ? '<a id="rf-add-calendar" href="' + esc(calendarUrl(lang, state.slot)) + '" target="_blank" rel="noreferrer" ' +
+            'class="mt-4 flex items-center justify-center gap-2 rounded-2xl border border-border bg-card px-4 py-3 text-sm font-bold text-foreground transition-colors hover:bg-muted">' +
+            icon('CalendarCheck', 'size-5 text-primary') + ' ' + t(lang, 'addToCalendar') + '</a>'
+          : '') +
+        '</div>';
       return h + '</section>';
     }
     var badEmail = String(state.email || '').length > 0 && !emailValid(state.email);
@@ -468,6 +512,6 @@
     LANGS: LANGS, setData: setData, dirOf: dirOf, t: t, page: page, booking: booking,
     dayChips: dayChips, slotGrid: slotGrid, slotsOf: slotsOf, fab: fab,
     emailValid: emailValid, phoneValid: phoneValid, fullPhone: fullPhone,
-    canSubmit: canSubmit, initialState: initialState,
+    canSubmit: canSubmit, initialState: initialState, calendarUrl: calendarUrl,
   };
 });
